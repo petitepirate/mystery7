@@ -79,7 +79,8 @@ class User {
    *
    * */
 
-  static async getAll(username, password) {
+  static async getAll() {  // *****************************Bug 2
+    // was static async getAll(username, password) - > remove unnecessary params
     const result = await db.query(
       `SELECT username,
                 first_name,

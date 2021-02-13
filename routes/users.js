@@ -17,7 +17,13 @@ const { authUser, requireLogin, requireAdmin } = require('../middleware/auth');
 
 router.get('/', authUser, requireLogin, async function(req, res, next) {
   try {
-    let users = await User.getAll();
+    let users = await User.getAll();  //****************************** Bug 3
+    // add in functionality that returns users data minus phone and email
+    users = users.map((user) => ({
+      username: user.username,
+      first_name: user.first_name,
+      last_name: user.last_name
+    }))
     return res.json({ users });
   } catch (err) {
     return next(err);
@@ -63,14 +69,27 @@ router.get('/:username', authUser, requireLogin, async function(
  *
  */
 
-router.patch('/:username', authUser, requireLogin, requireAdmin, async function(
+router.patch('/:username', authUser, requireLogin, async function(
+  //**********************************************************************************Bug 4
+  // remove requireAdmin to change Auth so that users can update themselves, not just admins
   req,
   res,
   next
 ) {
   try {
     if (!req.curr_admin && req.curr_username !== req.params.username) {
-      throw new ExpressError('Only  that user or admin can edit a user.', 401);
+      throw new ExpressError('Only that user or admin can edit a user.', 401);
+    }
+  //**********************************************************************************Bug 5
+    // Add conditional to fix non-admins from changing their admin status
+    if (!req.curr_admin && req.body.admin) {
+      throw new ExpressError('Only an admin can change this setting.', 401);
+    }
+
+    // ****************************************************************************Bug #6 
+    //Add conditional to throw error if user tries to update username or password
+    if (req.body.username || req.body.password) {
+      throw new ExpressError('Updating username or password not allowed.', 401);
     }
 
     // get fields to change; remove token so we don't try to change it
