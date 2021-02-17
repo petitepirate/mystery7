@@ -1,4 +1,10 @@
 
+DROP DATABASE bankly_test;
+CREATE DATABASE bankly_test;
+\connect bankly_test
+
+DROP TABLE users;
+
 CREATE TABLE users (
     username text PRIMARY KEY,
     first_name text NOT NULL,

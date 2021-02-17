@@ -51,7 +51,7 @@ describe("POST /auth/register", function() {
     expect(response.statusCode).toBe(201);
     expect(response.body).toEqual({ token: expect.any(String) });
 
-    let { username, admin } = jwt.verify(response.body.token, SECRET_KEY);
+    let { username, admin } = jwt.verify(response.body.token, SECRET_KEY);    // But 1- aligns with middleware now
     expect(username).toBe("new_user");
     expect(admin).toBe(false);
   });
@@ -86,13 +86,13 @@ describe("POST /auth/login", function() {
     expect(response.statusCode).toBe(200);
     expect(response.body).toEqual({ token: expect.any(String) });
 
-    let { username, admin } = jwt.verify(response.body.token, SECRET_KEY);
+    let { username, admin } = jwt.verify(response.body.token, SECRET_KEY); // Bug 1- aligns with middleware now
     expect(username).toBe("u1");
     expect(admin).toBe(false);
   });
 });
 
-describe("GET /users", function() {
+describe("GET /users", function() {   // Bug 2 (just removed unecessary params in User Class)
   test("should deny access if no token provided", async function() {
     const response = await request(app).get("/users");
     expect(response.statusCode).toBe(401);
@@ -104,6 +104,18 @@ describe("GET /users", function() {
       .send({ _token: tokens.u1 });
     expect(response.statusCode).toBe(200);
     expect(response.body.users.length).toBe(3);
+  });
+
+//***************************************************************************Tests Bug 3
+  test("should only include username, first, and last names for users", async function() {
+    const response = await request(app)
+      .get("/users")
+      .send({ _token: tokens.u1 });
+    expect(response.body.users[0]).toEqual({
+      username: "u1",
+      first_name: "fn1",
+      last_name: "ln1",
+    });
   });
 });
 
@@ -141,10 +153,11 @@ describe("PATCH /users/[username]", function() {
     expect(response.statusCode).toBe(401);
   });
 
-  test("should patch data if admin", async function() {
+  //***********************************************************Test Bug 4
+  test("should patch data if right user", async function() { //previously if admin
     const response = await request(app)
       .patch("/users/u1")
-      .send({ _token: tokens.u3, first_name: "new-fn1" }); // u3 is admin
+      .send({ _token: tokens.u1, first_name: "new-fn1" }); // prev token u3 - change to u1
     expect(response.statusCode).toBe(200);
     expect(response.body.user).toEqual({
       username: "u1",
@@ -157,7 +170,35 @@ describe("PATCH /users/[username]", function() {
     });
   });
 
-  test("should disallowing patching not-allowed-fields", async function() {
+    // ***************************************************Test Bug #4 cont.
+    // Make sure bug fix doesn't prevent admins from updating admin status on other users
+    test("should patch data - allow admin to update admin field", async function() {
+      const response = await request(app)
+        .patch("/users/u1")
+        .send({ _token: tokens.u3, admin: true }); // u3 is admin
+      expect(response.statusCode).toBe(200);
+      expect(response.body.user).toEqual({
+        username: "u1",
+        first_name: "fn1",
+        last_name: "ln1",
+        email: "email1",
+        phone: "phone1",
+        admin: true,
+        password: expect.any(String)
+      });
+    });
+
+    // ***************************************************Test Bug #5
+    // Make sure users cant set themselves to admins 
+    test("should disallow user setting themself to admin", async function() {
+    const response = await request(app)
+      .patch("/users/u1")
+      .send({ _token: tokens.u1, admin: true });
+    expect(response.statusCode).toBe(401);
+  });
+
+    // ***************************************************Test Bug #6
+  test("should disallow patching not-allowed-fields", async function() {
     const response = await request(app)
       .patch("/users/u1")
       .send({ _token: tokens.u1, admin: true });
